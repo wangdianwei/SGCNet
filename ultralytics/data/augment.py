@@ -19,7 +19,11 @@ from ultralytics.utils.checks import check_version
 from ultralytics.utils.instance import Instances
 from ultralytics.utils.metrics import bbox_ioa
 from ultralytics.utils.ops import segment2box, xywh2xyxy, xyxyxyxy2xywhr
-from ultralytics.utils.torch_utils import TORCHVISION_0_10, TORCHVISION_0_11, TORCHVISION_0_13
+from ultralytics.utils.torch_utils import (
+    TORCHVISION_0_10,
+    TORCHVISION_0_11,
+    TORCHVISION_0_13,
+)
 
 DEFAULT_MEAN = (0.0, 0.0, 0.0)
 DEFAULT_STD = (1.0, 1.0, 1.0)
@@ -49,7 +53,6 @@ class BaseTransform:
         This constructor sets up the base transformation object, which can be extended for specific image processing
         tasks. It is designed to be compatible with both classification and semantic segmentation.
         """
-        pass
 
     def apply_image(self, labels):
         """Apply image transformations to labels.
@@ -71,7 +74,6 @@ class BaseTransform:
             >>> print(transformed_labels)
             [1, 2, 3]
         """
-        pass
 
     def apply_instances(self, labels):
         """Apply transformations to object instances in labels.
@@ -91,7 +93,6 @@ class BaseTransform:
             >>> labels = {"instances": Instances(xyxy=torch.rand(5, 4), cls=torch.randint(0, 80, (5,)))}
             >>> transformed_labels = transform.apply_instances(labels)
         """
-        pass
 
     def apply_semantic(self, labels):
         """Apply semantic segmentation transformations to an image.
@@ -110,7 +111,6 @@ class BaseTransform:
             >>> semantic_mask = np.zeros((100, 100), dtype=np.uint8)
             >>> transformed_mask = transform.apply_semantic(semantic_mask)
         """
-        pass
 
     def __call__(self, labels):
         """Apply all label transformations to an image, instances, and semantic masks.
@@ -1734,8 +1734,10 @@ class CopyPaste(BaseMixTransform):
         labels.pop("mix_labels", None)
         return labels
 
-    def _transform(self, labels1: dict[str, Any], labels2: dict[str, Any] = {}) -> dict[str, Any]:
+    def _transform(self, labels1: dict[str, Any], labels2: dict[str, Any] | None = None) -> dict[str, Any]:
         """Apply Copy-Paste augmentation to combine objects from another image into the current image."""
+        if labels2 is None:
+            labels2 = {}
         im = labels1["img"]
         if "mosaic_border" not in labels1:
             im = im.copy()  # avoid modifying original non-mosaic image
@@ -2279,7 +2281,7 @@ class RandomLoadText:
         neg_samples: tuple[int, int] = (80, 80),
         max_samples: int = 80,
         padding: bool = False,
-        padding_value: list[str] = [""],
+        padding_value: list[str] | None = None,
     ) -> None:
         """Initialize the RandomLoadText class for randomly sampling positive and negative texts.
 
@@ -2296,6 +2298,8 @@ class RandomLoadText:
                 max_samples.
             padding_value (str): The padding text to use when padding is True.
         """
+        if padding_value is None:
+            padding_value = [""]
         self.prompt_format = prompt_format
         self.neg_samples = neg_samples
         self.max_samples = max_samples
