@@ -266,7 +266,6 @@ After exporting, verify numerical parity with the original PyTorch model before 
 import numpy as np
 import timm
 import torch
-
 from ultralytics.nn.backends import ONNXBackend
 
 model = timm.create_model("resnet18", pretrained=True).eval()

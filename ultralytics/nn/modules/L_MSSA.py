@@ -1,12 +1,10 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class L_MSSA(nn.Module):
-    """
-    Final Stable Version: ASFF-like Lightweight Multi-Scale Morphological Aligner
-    """
+    """Final Stable Version: ASFF-like Lightweight Multi-Scale Morphological Aligner."""
 
     def __init__(self, c_list, c2, level="P4", k_strip=5, alpha_init=-2.2, beta_init=-1.7):
         super().__init__()
@@ -26,17 +24,12 @@ class L_MSSA(nn.Module):
         self.proj4 = nn.Conv2d(c4, self.mid, kernel_size=1, bias=False)
         self.proj5 = nn.Conv2d(c5, self.mid, kernel_size=1, bias=False)
 
-        self.target_norm = nn.Sequential(
+        self.target_norm = nn.Sequential()
 
-        )
+        max(8, self.mid // 2)
+        self.aux_gate = nn.Sequential()
 
-        hidden = max(8, self.mid // 2)
-        self.aux_gate = nn.Sequential(
-
-        )
-
-        self.axial_strip = nn.Sequential(
-        )
+        self.axial_strip = nn.Sequential()
 
         self.out_conv = nn.Conv2d(self.mid, self.real_c2, kernel_size=1, bias=False)
 
@@ -76,9 +69,9 @@ class L_MSSA(nn.Module):
 
         aux = w_aux[:, 0:1] * a1 + w_aux[:, 1:2] * a2
 
-        beta = torch.sigmoid()     # ~0.15 init
-        alpha = torch.sigmoid()   # ~0.10 init
-        fused = t + beta * aux
+        beta = torch.sigmoid()  # ~0.15 init
+        alpha = torch.sigmoid()  # ~0.10 init
+        t + beta * aux
         refined = self.axial_strip()
 
         enh = self.out_conv(refined)

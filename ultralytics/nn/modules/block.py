@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.utils.torch_utils import fuse_conv_and_bn
 
@@ -50,9 +50,9 @@ __all__ = (
     "RepNCSPELAN4",
     "RepVGGDW",
     "ResNetLayer",
+    "RoadDefectMoE",
     "SCDown",
     "TorchVision",
-    "RoadDefectMoE",
 )
 
 
@@ -1946,10 +1946,9 @@ class SAVPE(nn.Module):
         return F.normalize(aggregated.transpose(-2, -3).reshape(B, Q, -1), dim=-1, p=2)
 
 
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+
 
 # -------------------------
 # Basic blocks
@@ -1968,7 +1967,8 @@ class ConvBNAct(nn.Module):
 
 
 class DWConvBNAct(nn.Module):
-    """Depthwise separable conv: DW -> PW"""
+    """Depthwise separable conv: DW -> PW."""
+
     def __init__(self, c, k=3, s=1, p=None, dil=1, act=True):
         super().__init__()
         if p is None:
@@ -1984,10 +1984,9 @@ class DWConvBNAct(nn.Module):
 # Road-defect experts (shape-specialized)
 # -------------------------
 class CrackExpert(nn.Module):
+    """细长裂缝：方向/条状卷积更敏感 用 (1,k) + (k,1) 的 depthwise strip conv 聚合沿方向上下文.
     """
-    细长裂缝：方向/条状卷积更敏感
-    用 (1,k) + (k,1) 的 depthwise strip conv 聚合沿方向上下文
-    """
+
     def __init__(self, c, k_strip=7):
         super().__init__()
         self.pre = ConvBNAct(c, c, k=1)
@@ -2002,9 +2001,8 @@ class CrackExpert(nn.Module):
 
 
 class PotholeExpert(nn.Module):
-    """
-    坑洞/坑槽：块状+上下文，膨胀卷积扩大感受野
-    """
+    """坑洞/坑槽：块状+上下文，膨胀卷积扩大感受野."""
+
     def __init__(self, c, dil=2):
         super().__init__()
         self.net = nn.Sequential(
@@ -2018,9 +2016,8 @@ class PotholeExpert(nn.Module):
 
 
 class PatchRepairExpert(nn.Module):
-    """
-    修补/块状纹理：更依赖局部大核纹理统计（轻量DW大核）
-    """
+    """修补/块状纹理：更依赖局部大核纹理统计（轻量DW大核）."""
+
     def __init__(self, c, k_big=9):
         super().__init__()
         self.net = nn.Sequential(
@@ -2034,9 +2031,8 @@ class PatchRepairExpert(nn.Module):
 
 
 class ContextExpert(nn.Module):
-    """
-    轻量上下文(ASPP-lite)：应对复杂背景/阴影干扰
-    """
+    """轻量上下文(ASPP-lite)：应对复杂背景/阴影干扰."""
+
     def __init__(self, c, dils=(1, 2, 4)):
         super().__init__()
         self.pre = ConvBNAct(c, c, k=1)
@@ -2054,12 +2050,9 @@ class ContextExpert(nn.Module):
 # Single-modal morphology cues for gating
 # -------------------------
 class MorphologyCueHead(nn.Module):
+    """从同一张特征图 x 里，提取两个“形态提示”（单模态）： - line-like：条状/边缘/裂缝倾向 - blob-like：块状/坑洞倾向 输出: B x 2.
     """
-    从同一张特征图 x 里，提取两个“形态提示”（单模态）：
-      - line-like：条状/边缘/裂缝倾向
-      - blob-like：块状/坑洞倾向
-    输出: B x 2
-    """
+
     def __init__(self, c, k_strip=7, dil=2, mid=32):
         super().__init__()
         self.reduce = ConvBNAct(c, mid, k=1)
@@ -2075,10 +2068,10 @@ class MorphologyCueHead(nn.Module):
         self.proj = nn.Conv2d(mid, 2, kernel_size=1, bias=True)
 
     def forward(self, x):
-        z = self.reduce(x)                        # B,mid,H,W
-        line = self.line_h(z) + self.line_v(z)    # B,mid,H,W
-        blob = self.blob(z)                       # B,mid,H,W
-        m = self.proj(line + blob)                # B,2,H,W
+        z = self.reduce(x)  # B,mid,H,W
+        line = self.line_h(z) + self.line_v(z)  # B,mid,H,W
+        blob = self.blob(z)  # B,mid,H,W
+        m = self.proj(line + blob)  # B,2,H,W
         cue = F.adaptive_avg_pool2d(m, 1).flatten(1)  # B,2
         return cue
 
@@ -2087,12 +2080,10 @@ class MorphologyCueHead(nn.Module):
 # Road-defect Single-modal MoE
 # -------------------------
 class RoadDefectMoE(nn.Module):
+    """单模态 MoE（输入就是一个特征图 x） - experts: 裂缝 / 坑洞 / 修补 / 上下文（默认4个） - gate: GAP(x) + morphology_cues(x) -> expert weights -
+    top_k routing: 只激活 top-k 专家.
     """
-    单模态 MoE（输入就是一个特征图 x）
-    - experts: 裂缝 / 坑洞 / 修补 / 上下文（默认4个）
-    - gate: GAP(x) + morphology_cues(x) -> expert weights
-    - top_k routing: 只激活 top-k 专家
-    """
+
     def __init__(self, channels, num_experts=4, top_k=2, k_strip=7, dil=2, renorm_topk=True):
         super().__init__()
         assert num_experts == 4, "当前实现默认 4 个专家（裂缝/坑洞/修补/上下文）。如需扩展我也可以给你改。"
@@ -2104,12 +2095,14 @@ class RoadDefectMoE(nn.Module):
         self.renorm_topk = renorm_topk
 
         # shape-specialized experts
-        self.experts = nn.ModuleList([
-            CrackExpert(channels, k_strip=k_strip),
-            PotholeExpert(channels, dil=dil),
-            PatchRepairExpert(channels, k_big=9),
-            ContextExpert(channels, dils=(1, 2, 4)),
-        ])
+        self.experts = nn.ModuleList(
+            [
+                CrackExpert(channels, k_strip=k_strip),
+                PotholeExpert(channels, dil=dil),
+                PatchRepairExpert(channels, k_big=9),
+                ContextExpert(channels, dils=(1, 2, 4)),
+            ]
+        )
 
         # morphology cues (single-modal)
         self.cue = MorphologyCueHead(channels, k_strip=k_strip, dil=dil, mid=min(32, channels))
@@ -2125,19 +2118,17 @@ class RoadDefectMoE(nn.Module):
         self.alpha = nn.Parameter(torch.tensor(1.0))
 
     def forward(self, x):
+        """x: B,C,H,W return: B,C,H,W.
         """
-        x: B,C,H,W
-        return: B,C,H,W
-        """
-        B, C, H, W = x.shape
+        B, _C, _H, _W = x.shape
 
         # 1) gating features (single-modal)
         gap = F.adaptive_avg_pool2d(x, 1).flatten(1)  # B,C
-        cue = self.cue(x)                              # B,2
-        g_in = torch.cat([gap, cue], dim=1)           # B,C+2
+        cue = self.cue(x)  # B,2
+        g_in = torch.cat([gap, cue], dim=1)  # B,C+2
 
-        gate_logits = self.gate_fc(g_in)              # B,E
-        gate_scores = F.softmax(gate_logits, dim=1)   # B,E
+        gate_logits = self.gate_fc(g_in)  # B,E
+        gate_scores = F.softmax(gate_logits, dim=1)  # B,E
 
         # 2) top-k routing
         topk_scores, topk_idx = torch.topk(gate_scores, k=self.top_k, dim=1)  # B,k
@@ -2150,22 +2141,21 @@ class RoadDefectMoE(nn.Module):
         sparse_w.scatter_(1, topk_idx, topk_scores)
 
         # 3) experts forward
-        outs = [e(x) for e in self.experts]                           # list of B,C,H,W
-        outs = torch.stack(outs, dim=1)                               # B,E,C,H,W
+        outs = [e(x) for e in self.experts]  # list of B,C,H,W
+        outs = torch.stack(outs, dim=1)  # B,E,C,H,W
 
-        w = sparse_w.view(B, self.num_experts, 1, 1, 1)               # B,E,1,1,1
-        y = (outs * w).sum(dim=1)                                     # B,C,H,W
+        w = sparse_w.view(B, self.num_experts, 1, 1, 1)  # B,E,1,1,1
+        y = (outs * w).sum(dim=1)  # B,C,H,W
 
         # 4) residual (更稳，且不破坏主干特征)
         return x + self.alpha * y
 
 
-
 # moe专家模块
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+
 
 # -------------------------
 # Utils
@@ -2183,6 +2173,7 @@ def _auto_pad(k, dil=1):
 # -------------------------
 class ConvBNAct(nn.Module):
     """Conv + BN + SiLU (YOLO-style). Keeps size if stride=1 and padding is correct."""
+
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, dil=1, act=True):
         super().__init__()
         if p is None:
@@ -2196,7 +2187,8 @@ class ConvBNAct(nn.Module):
 
 
 class DWConvBNAct(nn.Module):
-    """Depthwise separable conv: DW(keep size) -> PW"""
+    """Depthwise separable conv: DW(keep size) -> PW."""
+
     def __init__(self, c, k=3, s=1, dil=1, act=True):
         super().__init__()
         assert s == 1, "This block is intended to keep spatial size; use stride=1."
@@ -2213,6 +2205,7 @@ class DWConvBNAct(nn.Module):
 # -------------------------
 class CrackExpert(nn.Module):
     """Strip/Directional DW convs for thin cracks."""
+
     def __init__(self, c, k_strip=7):
         super().__init__()
         assert k_strip % 2 == 1, "k_strip should be odd."
@@ -2230,6 +2223,7 @@ class CrackExpert(nn.Module):
 
 class PotholeExpert(nn.Module):
     """Dilated DW conv for blob/pothole context (keeps size)."""
+
     def __init__(self, c, dil=2):
         super().__init__()
         self.net = nn.Sequential(
@@ -2244,6 +2238,7 @@ class PotholeExpert(nn.Module):
 
 class PatchRepairExpert(nn.Module):
     """Big-kernel DW for patch/repair texture (keeps size)."""
+
     def __init__(self, c, k_big=9):
         super().__init__()
         assert k_big % 2 == 1, "k_big should be odd."
@@ -2259,6 +2254,7 @@ class PatchRepairExpert(nn.Module):
 
 class ContextExpert(nn.Module):
     """ASPP-lite with multiple dilations. All branches keep size."""
+
     def __init__(self, c, dils=(1, 2, 4)):
         super().__init__()
         self.pre = ConvBNAct(c, c, k=1)
@@ -2280,12 +2276,9 @@ class ContextExpert(nn.Module):
 # Single-modal morphology cue head (outputs Bx2, keeps size)
 # -------------------------
 class MorphologyCueHead(nn.Module):
+    """Single-modal cues from same feature x: - line-like - blob-like Output: (B,2).
     """
-    Single-modal cues from same feature x:
-      - line-like
-      - blob-like
-    Output: (B,2)
-    """
+
     def __init__(self, c, k_strip=7, dil=2, mid=32):
         super().__init__()
         assert k_strip % 2 == 1, "k_strip should be odd."
@@ -2297,9 +2290,9 @@ class MorphologyCueHead(nn.Module):
         self.line_v = ConvBNAct(mid, mid, k=(k_strip, 1), s=1, p=_auto_pad((k_strip, 1), 1), g=mid)
 
         # blob-like (dilated depthwise conv) -> keep size with padding=dil
-        self.blob = nn.Conv2d(mid, mid, kernel_size=3, stride=1,
-                              padding=_auto_pad(3, dil=dil), dilation=dil,
-                              groups=mid, bias=False)
+        self.blob = nn.Conv2d(
+            mid, mid, kernel_size=3, stride=1, padding=_auto_pad(3, dil=dil), dilation=dil, groups=mid, bias=False
+        )
         self.bn = nn.BatchNorm2d(mid)
         self.act = nn.SiLU(inplace=True)
 
@@ -2309,7 +2302,7 @@ class MorphologyCueHead(nn.Module):
         z = self.reduce(x)
         line = self.line_h(z) + self.line_v(z)
         blob = self.act(self.bn(self.blob(z)))
-        m = self.proj(line + blob)                 # B,2,H,W (same H/W)
+        m = self.proj(line + blob)  # B,2,H,W (same H/W)
         cue = F.adaptive_avg_pool2d(m, 1).flatten(1)  # B,2
         return cue
 
@@ -2318,17 +2311,14 @@ class MorphologyCueHead(nn.Module):
 # RoadDefectMoE (Ultralytics-friendly)
 # -------------------------
 class RoadDefectMoE(nn.Module):
+    """Ultralytics parse_model friendly signature: __init__(c1, c2, num_experts, top_k, k_strip, dil, ...) - parse_model
+    will scale c2 (args[0]) by width; num_experts will NOT be scaled. - output channels = c2.
     """
-    Ultralytics parse_model friendly signature:
-      __init__(c1, c2, num_experts, top_k, k_strip, dil, ...)
-    - parse_model will scale c2 (args[0]) by width; num_experts will NOT be scaled.
-    - output channels = c2
-    """
+
     def __init__(self, c1, c2, num_experts=4, top_k=2, k_strip=7, dil=2, renorm_topk=True):
         super().__init__()
         assert num_experts == 4, (
-            f"num_experts={num_experts} (expected 4). "
-            f"YAML should be like: RoadDefectMoE, [<c2>, 4, 2, 7, 2]"
+            f"num_experts={num_experts} (expected 4). YAML should be like: RoadDefectMoE, [<c2>, 4, 2, 7, 2]"
         )
         assert 1 <= top_k <= num_experts
 
@@ -2341,12 +2331,14 @@ class RoadDefectMoE(nn.Module):
         self.in_proj = ConvBNAct(c1, c2, k=1) if c1 != c2 else nn.Identity()
 
         ch = c2
-        self.experts = nn.ModuleList([
-            CrackExpert(ch, k_strip=k_strip),
-            PotholeExpert(ch, dil=dil),
-            PatchRepairExpert(ch, k_big=9),
-            ContextExpert(ch, dils=(1, 2, 4)),
-        ])
+        self.experts = nn.ModuleList(
+            [
+                CrackExpert(ch, k_strip=k_strip),
+                PotholeExpert(ch, dil=dil),
+                PatchRepairExpert(ch, k_big=9),
+                ContextExpert(ch, dils=(1, 2, 4)),
+            ]
+        )
 
         self.cue = MorphologyCueHead(ch, k_strip=k_strip, dil=dil, mid=32)
 
@@ -2361,12 +2353,12 @@ class RoadDefectMoE(nn.Module):
 
     def forward(self, x):
         x = self.in_proj(x)  # ensure channels = c2
-        B, C, H, W = x.shape
+        B, _C, H, W = x.shape
 
         # gating features
         gap = F.adaptive_avg_pool2d(x, 1).flatten(1)  # B,C
-        cue = self.cue(x)                              # B,2
-        g_in = torch.cat([gap, cue], dim=1)           # B,C+2
+        cue = self.cue(x)  # B,2
+        g_in = torch.cat([gap, cue], dim=1)  # B,C+2
 
         gate_scores = F.softmax(self.gate_fc(g_in), dim=1)  # B,E
 
