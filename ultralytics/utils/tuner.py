@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from ultralytics.cfg import TASK2DATA, TASK2METRIC, get_cfg, get_save_dir
-from ultralytics.utils import DEFAULT_CFG, DEFAULT_CFG_DICT, LOGGER, NUM_THREADS, checks, colorstr
+from ultralytics.utils import (
+    DEFAULT_CFG,
+    DEFAULT_CFG_DICT,
+    LOGGER,
+    NUM_THREADS,
+    checks,
+    colorstr,
+)
 
 
 def run_ray_tune(
@@ -127,7 +134,7 @@ def run_ray_tune(
     tune_dir = get_save_dir(
         get_cfg(
             DEFAULT_CFG,
-            {**train_args, **{"exist_ok": train_args.pop("resume", False)}},  # resume w/ same tune_dir
+            {**train_args, "exist_ok": train_args.pop("resume", False)},  # resume w/ same tune_dir
         ),
         name=train_args.pop("name", "tune"),  # runs/{task}/{tune_dir}
     )  # must be absolute dir

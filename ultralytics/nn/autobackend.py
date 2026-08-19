@@ -13,11 +13,26 @@ from typing import Any
 import cv2
 import numpy as np
 import torch
-import torch.nn as nn
 from PIL import Image
+from torch import nn
 
-from ultralytics.utils import ARM64, IS_JETSON, LINUX, LOGGER, PYTHON_VERSION, ROOT, YAML, is_jetson
-from ultralytics.utils.checks import check_requirements, check_suffix, check_version, check_yaml, is_rockchip
+from ultralytics.utils import (
+    ARM64,
+    IS_JETSON,
+    LINUX,
+    LOGGER,
+    PYTHON_VERSION,
+    ROOT,
+    YAML,
+    is_jetson,
+)
+from ultralytics.utils.checks import (
+    check_requirements,
+    check_suffix,
+    check_version,
+    check_yaml,
+    is_rockchip,
+)
 from ultralytics.utils.downloads import attempt_download_asset, is_url
 from ultralytics.utils.nms import non_max_suppression
 
@@ -261,7 +276,9 @@ class AutoBackend(nn.Module):
                 w = next(Path(w).glob("*.onnx"))
                 LOGGER.info(f"Loading {w} for ONNX IMX inference...")
                 import mct_quantizers as mctq
-                from edgemdt_cl.pytorch.nms import nms_ort  # noqa - register custom NMS ops
+                from edgemdt_cl.pytorch.nms import (
+                    nms_ort,  # noqa - register custom NMS ops
+                )
 
                 session_options = mctq.get_ort_session_options()
                 session_options.enable_mem_reuse = False  # fix the shape mismatch from onnxruntime
@@ -360,9 +377,9 @@ class AutoBackend(nn.Module):
             # Model context
             try:
                 context = model.create_execution_context()
-            except Exception as e:  # model is None
+            except Exception:  # model is None
                 LOGGER.error(f"TensorRT model exported with a different version than {trt.__version__}\n")
-                raise e
+                raise
 
             bindings = OrderedDict()
             output_names = []

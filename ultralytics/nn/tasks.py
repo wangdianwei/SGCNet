@@ -6,10 +6,9 @@ import re
 import types
 from copy import deepcopy
 from pathlib import Path
+
 import torch
-import torch.nn as nn
-from ultralytics.nn.modules.LGAF import LGAF
-from ultralytics.nn.modules.L_MSSA import L_MSSA
+from torch import nn
 
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
@@ -61,19 +60,20 @@ from ultralytics.nn.modules import (
     RepNCSPELAN4,
     RepVGGDW,
     ResNetLayer,
+    RoadDefectMoE,
     RTDETRDecoder,
     SCDown,
     Segment,
+    SGCLStrip,
+    SGCLStripConfig,
     TorchVision,
     WorldDetect,
     YOLOEDetect,
     YOLOESegment,
     v10Detect,
-    RoadDefectMoE,
-    SGCLStrip,
-    SGCLStripConfig,
-
 )
+from ultralytics.nn.modules.L_MSSA import L_MSSA
+from ultralytics.nn.modules.LGAF import LGAF
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
@@ -97,8 +97,6 @@ from ultralytics.utils.torch_utils import (
     smart_inference_mode,
     time_sync,
 )
-
-
 
 
 class BaseModel(torch.nn.Module):
@@ -1336,11 +1334,9 @@ class SafeClass:
 
     def __init__(self, *args, **kwargs):
         """Initialize SafeClass instance, ignoring all arguments."""
-        pass
 
     def __call__(self, *args, **kwargs):
         """Run SafeClass instance, ignoring all arguments."""
-        pass
 
 
 class SafeUnpickler(pickle.Unpickler):
@@ -1628,8 +1624,6 @@ def parse_model(d, ch, verbose=True):
         elif m is ResNetLayer:
             c2 = args[1] if args[3] else args[1] * 4
 
-
-
         elif m is L_MSSA:
             assert isinstance(f, list), f"MSMA expects list input, but got f={f}"
             c_list = [ch[x] for x in f]
@@ -1658,15 +1652,10 @@ def parse_model(d, ch, verbose=True):
             # 这里简单起见，直接用默认配置
             args = [c1, cfg]
 
-
-
         elif m is LGAF:
             c1, c2 = ch[f], args[0]
             c2 = make_divisible(c2 * width, 8)
             args = [c1, c2, n, *args[1:]]
-
-
-
 
         elif m is torch.nn.BatchNorm2d:
             args = [ch[f]]
