@@ -80,7 +80,12 @@ from ultralytics.data.dataset import YOLODataset
 from ultralytics.data.utils import check_cls_dataset, check_det_dataset
 from ultralytics.nn.autobackend import check_class_names, default_class_names
 from ultralytics.nn.modules import C2f, Classify, Detect, RTDETRDecoder
-from ultralytics.nn.tasks import ClassificationModel, DetectionModel, SegmentationModel, WorldModel
+from ultralytics.nn.tasks import (
+    ClassificationModel,
+    DetectionModel,
+    SegmentationModel,
+    WorldModel,
+)
 from ultralytics.utils import (
     ARM64,
     DEFAULT_CFG,
@@ -245,7 +250,7 @@ def try_export(inner_func):
             return f
         except Exception as e:
             LOGGER.error(f"{prefix} export failure {dt.t:.1f}s: {e}")
-            raise e
+            raise
 
     return outer_func
 
@@ -874,19 +879,19 @@ class Exporter:
         LOGGER.info(f"\n{prefix} starting export with NCNN {ncnn.__version__} and PNNX {pnnx.__version__}...")
         f = Path(str(self.file).replace(self.file.suffix, f"_ncnn_model{os.sep}"))
 
-        ncnn_args = dict(
-            ncnnparam=(f / "model.ncnn.param").as_posix(),
-            ncnnbin=(f / "model.ncnn.bin").as_posix(),
-            ncnnpy=(f / "model_ncnn.py").as_posix(),
-        )
+        ncnn_args = {
+            "ncnnparam": (f / "model.ncnn.param").as_posix(),
+            "ncnnbin": (f / "model.ncnn.bin").as_posix(),
+            "ncnnpy": (f / "model_ncnn.py").as_posix(),
+        }
 
-        pnnx_args = dict(
-            ptpath=(f / "model.pt").as_posix(),
-            pnnxparam=(f / "model.pnnx.param").as_posix(),
-            pnnxbin=(f / "model.pnnx.bin").as_posix(),
-            pnnxpy=(f / "model_pnnx.py").as_posix(),
-            pnnxonnx=(f / "model.pnnx.onnx").as_posix(),
-        )
+        pnnx_args = {
+            "ptpath": (f / "model.pt").as_posix(),
+            "pnnxparam": (f / "model.pnnx.param").as_posix(),
+            "pnnxbin": (f / "model.pnnx.bin").as_posix(),
+            "pnnxpy": (f / "model_pnnx.py").as_posix(),
+            "pnnxonnx": (f / "model.pnnx.onnx").as_posix(),
+        }
 
         f.mkdir(exist_ok=True)  # make ncnn_model directory
         pnnx.export(self.model, inputs=self.im, **ncnn_args, **pnnx_args, fp16=self.args.half, device=self.device.type)
@@ -1208,7 +1213,9 @@ class Exporter:
         # Pin numpy to avoid coremltools errors with numpy>=2.4.0, must be separate
         check_requirements("numpy<=2.3.5")
 
-        from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
+        from executorch.backends.xnnpack.partition.xnnpack_partitioner import (
+            XnnpackPartitioner,
+        )
         from executorch.exir import to_edge_transform_and_lower
 
         file_directory = Path(str(self.file).replace(self.file.suffix, "_executorch_model"))
@@ -1517,7 +1524,7 @@ class NMSModel(torch.nn.Module):
 
         preds = self.model(x)
         pred = preds[0] if isinstance(preds, tuple) else preds
-        kwargs = dict(device=pred.device, dtype=pred.dtype)
+        kwargs = {"device": pred.device, "dtype": pred.dtype}
         bs = pred.shape[0]
         pred = pred.transpose(-1, -2)  # shape(1,84,6300) to shape(1,6300,84)
         extra_shape = pred.shape[-1] - (4 + len(self.model.names))  # extras from Segment, OBB, Pose
