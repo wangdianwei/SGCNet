@@ -17,7 +17,11 @@ from PIL import Image
 from torch.utils.data import Dataset, dataloader, distributed
 
 from ultralytics.cfg import IterableSimpleNamespace
-from ultralytics.data.dataset import GroundingDataset, YOLODataset, YOLOMultiModalDataset
+from ultralytics.data.dataset import (
+    GroundingDataset,
+    YOLODataset,
+    YOLOMultiModalDataset,
+)
 from ultralytics.data.loaders import (
     LOADERS,
     LoadImagesAndVideos,
@@ -432,6 +436,6 @@ def load_inference_source(
         dataset = LoadImagesAndVideos(source, batch=batch, vid_stride=vid_stride, channels=channels)
 
     # Attach source types to the dataset
-    setattr(dataset, "source_type", source_type)
+    dataset.source_type = source_type
 
     return dataset
