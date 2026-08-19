@@ -1,0 +1,12 @@
+path: data/UAV_PDD_offical
+train: ./images/train
+val: ./images/val
+test: ./images/test
+nc: 6
+names:
+  0: Transverse crack
+  1: Oblique crack
+  2: Alligator crack
+  3: Longitudinal crack
+  4: Pothole
+  5: Repair
