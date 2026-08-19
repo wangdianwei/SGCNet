@@ -6,7 +6,11 @@ from ultralytics.utils import RANK, SETTINGS
 def on_pretrain_routine_start(trainer):
     """Initialize and start console logging immediately at the very beginning."""
     if RANK in {-1, 0}:
-        from ultralytics.utils.logger import DEFAULT_LOG_PATH, ConsoleLogger, SystemLogger
+        from ultralytics.utils.logger import (
+            DEFAULT_LOG_PATH,
+            ConsoleLogger,
+            SystemLogger,
+        )
 
         trainer.system_logger = SystemLogger()
         trainer.console_logger = ConsoleLogger(DEFAULT_LOG_PATH)
@@ -15,7 +19,6 @@ def on_pretrain_routine_start(trainer):
 
 def on_pretrain_routine_end(trainer):
     """Handle pre-training routine completion event."""
-    pass
 
 
 def on_fit_epoch_end(trainer):
@@ -27,7 +30,6 @@ def on_fit_epoch_end(trainer):
 
 def on_model_save(trainer):
     """Handle model checkpoint save event."""
-    pass
 
 
 def on_train_end(trainer):
@@ -38,22 +40,18 @@ def on_train_end(trainer):
 
 def on_train_start(trainer):
     """Handle training start event."""
-    pass
 
 
 def on_val_start(validator):
     """Handle validation start event."""
-    pass
 
 
 def on_predict_start(predictor):
     """Handle prediction start event."""
-    pass
 
 
 def on_export_start(exporter):
     """Handle model export start event."""
-    pass
 
 
 callbacks = (

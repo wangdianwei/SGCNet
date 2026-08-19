@@ -8,7 +8,10 @@ from typing import Any
 import cv2
 import numpy as np
 
-from ultralytics.solutions.solutions import BaseSolution, SolutionResults  # Import a parent class
+from ultralytics.solutions.solutions import (  # Import a parent class
+    BaseSolution,
+    SolutionResults,
+)
 from ultralytics.utils import plt_settings
 
 
@@ -176,20 +179,20 @@ class Analytics(BaseSolution):
                 color_cycle = cycle(["#DD00BA", "#042AFF", "#FF4447", "#7D24FF", "#BD00FF"])
                 # Multiple lines or area update
                 x_data = self.ax.lines[0].get_xdata() if self.ax.lines else np.array([])
-                y_data_dict = {key: np.array([]) for key in count_dict.keys()}
+                y_data_dict = {key: np.array([]) for key in count_dict}
                 if self.ax.lines:
                     for line, key in zip(self.ax.lines, count_dict.keys()):
                         y_data_dict[key] = line.get_ydata()
 
                 x_data = np.append(x_data, float(frame_number))
                 max_length = len(x_data)
-                for key in count_dict.keys():
+                for key in count_dict:
                     y_data_dict[key] = np.append(y_data_dict[key], float(count_dict[key]))
                     if len(y_data_dict[key]) < max_length:
                         y_data_dict[key] = np.pad(y_data_dict[key], (0, max_length - len(y_data_dict[key])))
                 if len(x_data) > self.max_points:
                     x_data = x_data[1:]
-                    for key in count_dict.keys():
+                    for key in count_dict:
                         y_data_dict[key] = y_data_dict[key][1:]
 
                 self.ax.clear()
