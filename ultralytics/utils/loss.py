@@ -3,28 +3,30 @@
 from __future__ import annotations
 
 from typing import Any
-from ultralytics.utils import LOGGER
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from ultralytics.utils.torch_utils import unwrap_model
+from torch import nn
 
 from ultralytics.utils.metrics import OKS_SIGMA
 from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
-from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
+from ultralytics.utils.tal import (
+    RotatedTaskAlignedAssigner,
+    TaskAlignedAssigner,
+    dist2bbox,
+    dist2rbox,
+    make_anchors,
+)
 from ultralytics.utils.torch_utils import autocast
 
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
-from ultralytics.utils import LOGGER
+
+
 # 添加 FCLGS损失
 def build_pseudo_centerline_from_gt(gt_labels, gt_bboxes, mask_gt, Hf, Wf, imgsz, crack_cls=(0, 1)):
-    """
-    gt_labels: [B, M, 1]
-    gt_bboxes: [B, M, 4]  (xyxy, 像素坐标)
-    mask_gt:   [B, M, 1]  (bool)
-    imgsz:     tensor([H_img, W_img])  (像素)
-    return:    [B, 1, Hf, Wf] (0/1 softened)
+    """gt_labels: [B, M, 1] gt_bboxes: [B, M, 4] (xyxy, 像素坐标) mask_gt: [B, M, 1] (bool) imgsz: tensor([H_img, W_img])
+    (像素) return: [B, 1, Hf, Wf] (0/1 softened).
     """
     device = gt_bboxes.device
     B, M, _ = gt_bboxes.shape
@@ -63,24 +65,20 @@ def build_pseudo_centerline_from_gt(gt_labels, gt_bboxes, mask_gt, Hf, Wf, imgsz
             yc = (y1f + y2f) // 2
 
             # 线宽：跟短边成比例（稳健）
-            t = max(1, int(round(min(w, h) * 0.15)))
+            t = max(1, round(min(w, h) * 0.15))
 
             if w > h:
                 y_lo = max(0, yc - t)
                 y_hi = min(Hf - 1, yc + t)
-                tgt[b, 0, y_lo:y_hi + 1, x1f:x2f + 1] = 1.0
+                tgt[b, 0, y_lo : y_hi + 1, x1f : x2f + 1] = 1.0
             else:
                 x_lo = max(0, xc - t)
                 x_hi = min(Wf - 1, xc + t)
-                tgt[b, 0, y1f:y2f + 1, x_lo:x_hi + 1] = 1.0
+                tgt[b, 0, y1f : y2f + 1, x_lo : x_hi + 1] = 1.0
 
     # 软化一下（让监督更稳定）
     tgt = F.avg_pool2d(tgt, kernel_size=3, stride=1, padding=1)
     return tgt
-
-
-
-
 
 
 class VarifocalLoss(nn.Module):
@@ -299,7 +297,7 @@ class v8DetectionLoss:
         # --- 新增：查找模型中是否有 SGCLStrip 模块 ---
         self.sgcl_module = None
         for m in model.modules():
-            if m.__class__.__name__ == 'SGCLStrip':
+            if m.__class__.__name__ == "SGCLStrip":
                 self.sgcl_module = m
                 break
         # ----------------------------------------
@@ -389,19 +387,18 @@ class v8DetectionLoss:
         loss[1] *= self.hyp.cls  # cls gain
         loss[2] *= self.hyp.dfl  # dfl gain
 
-
         if self.sgcl_module is not None and self.model.training:
             # ✅ 修改为：使用我们在 forward 中缓存的原始特征图
             # 必须确保 hasattr 检查，防止第一轮 forward 还没跑完就报错（虽然不太可能）
-            if hasattr(self.sgcl_module, 'temp_feat'):
+            if hasattr(self.sgcl_module, "temp_feat"):
                 target_feat = self.sgcl_module.temp_feat
 
                 # 调用 forward_loss
-                aux_loss, stats = self.sgcl_module.forward_loss(
+                aux_loss, _stats = self.sgcl_module.forward_loss(
                     target_feat,
-                    batch['img'],
+                    batch["img"],
                     batch,
-                    stride=8.0  # P3 stride 固定为 8
+                    stride=8.0,  # P3 stride 固定为 8
                 )
                 # # 或者简单粗暴直接 print，确认看到输出后立刻停止训练删掉
                 # if aux_loss > 0:
@@ -409,7 +406,6 @@ class v8DetectionLoss:
                 # # ============================================
 
                 loss[0] += aux_loss
-
 
         return loss * batch_size, loss.detach()  # loss(box, cls, dfl)
 
@@ -961,10 +957,3 @@ class TVPSegmentLoss(TVPDetectLoss):
         vp_loss = self.vp_criterion((vp_feats, pred_masks, proto), batch)
         cls_loss = vp_loss[0][2]
         return cls_loss, vp_loss[1]
-
-
-
-
-
-
-
